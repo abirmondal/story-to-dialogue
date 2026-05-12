@@ -1,19 +1,20 @@
 # Project dependencies for story-to-dialgoue
-torch           # PyTorch for transformer models
-transformers    # For transformer models from Hugging Face
-datasets        # For dataset handling from Hugging Face
-dotenv          # For environment variable management
-wandb           # For experiment tracking
-evaluate        # For model evaluation
-rouge_score     # For ROUGE evaluation
-sacrebleu       # For BLEU evaluation
-bert-score      # For BERTScore evaluation
-nltk            # For natural language processing
-tqdm            # For progress bars
-langchain       # For language model chaining
-langchain[groq] # For GROQ support
-peft            # For parameter-efficient fine-tuning (used for LoRA finetuning)
-unsloth         # For unsloth library functionalities (used for QLoRA finetuning on llama models)
-xformers        # For efficient transformer implementations
-trl             # For training reinforcement learning models
-bitsandbytes    # For 8-bit optimizers and quantization
+torch               # PyTorch for transformer models
+transformers        # For transformer models from Hugging Face
+datasets            # For dataset handling from Hugging Face
+dotenv              # For environment variable management
+wandb               # For experiment tracking
+evaluate            # For model evaluation
+rouge_score         # For ROUGE evaluation
+sacrebleu           # For BLEU evaluation
+bert-score          # For BERTScore evaluation
+nltk                # For natural language processing
+tqdm                # For progress bars
+langchain           # For language model chaining
+langchain[groq]     # For GROQ support
+peft                # For parameter-efficient fine-tuning (used for LoRA finetuning)
+unsloth             # For unsloth library functionalities (used for QLoRA finetuning on llama models)
+xformers            # For efficient transformer implementations
+trl                 # For training reinforcement learning models
+bitsandbytes        # For 8-bit optimizers and quantization
+indictranstoolkit   # For Indic language translation tools

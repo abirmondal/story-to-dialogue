@@ -1,155 +1,174 @@
 """
 n2d_translate.py
 
-This module provides functionality to translate narrative-to-story data.
+Translate narrative-to-dialogue text and character names using the
+`ai4bharat/indictrans2-en-indic-1B` NMT model via Hugging Face Transformers.
 """
 
+import json
+from typing import List, Dict, Optional
+
 import torch
-from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
+from tqdm.auto import tqdm
+from IndicTransToolkit import IndicProcessor
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
 
 class N2DTranslate:
+    """Handle translation using ai4bharat/indictrans2-en-indic-1B.
+
+        Notes:
+        - This class uses `IndicProcessor` from IndicTransToolkit.
+        - Provide language codes (e.g. `eng_Latn`, `ben_Beng`) via
+            `source_lang_code` / `target_lang_code`. Defaults are English -> Bengali.
     """
-    Class to handle translation of narrative-to-story data.
-    """
+
     def __init__(
-            self,
-            translation_model_name: str = "google/translategemma-4b-it",
-            device: str = "cuda" if torch.cuda.is_available() else "cpu",
-            load_in_4bit: bool = False,
-            load_in_8bit: bool = False,
-            source_lang: str = "en",
-            target_lang: str = "bn"
-        ) -> None:
-        """
-        Initializes the N2DTranslate class.
+        self,
+        translation_model_name: str = "ai4bharat/indictrans2-en-indic-1B",
+        device: Optional[str] = None,
+        source_lang_code: str = "eng_Latn",
+        target_lang_code: str = "ben_Beng",
+        use_fp16: bool = True,
+        attn_implementation: Optional[str] = None,
+    ) -> None:
+        """Initialize model, tokenizer and Indic processor.
 
         Args:
-            translation_model_name (str): The name of the translation model to use.
-            device (str): The device to run the model on (e.g., "cuda" or "cpu").
-            load_in_4bit (bool): Whether to load the model in 4-bit precision.
-            load_in_8bit (bool): Whether to load the model in 8-bit precision.
-            source_lang (str): The source language code (e.g., "en").
-            target_lang (str): The target language code (e.g., "bn").
+            translation_model_name: HF model repo id.
+            device: device string, default autodetected.
+            source_lang_code: source language code used by IndicProcessor.
+            target_lang_code: target language code used by IndicProcessor.
+            use_fp16: whether to load model weights in float16 (recommended on CUDA).
+            attn_implementation: optional attention implementation for performance.
         """
-        self.device = device
-        self.source_lang = source_lang
-        self.target_lang = target_lang
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.source_lang_code = source_lang_code
+        self.target_lang_code = target_lang_code
 
-        # Load the translation model and processor
-        if load_in_4bit and device == "cuda":
-            # For 4-bit quantization with advanced settings for better performance and quality
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",             # Use NF4 for better quality than standard 4-bit
-                bnb_4bit_use_double_quant=True,        # Saves even more memory (adds a second quantization step)
-                bnb_4bit_compute_dtype=torch.bfloat16  # Recommended for newer models like Gemma
-            )
-        elif load_in_8bit and device == "cuda":
-            # For 8-bit quantization
-            bnb_config = BitsAndBytesConfig(load_in_8bit=True)
-
-        # Load the processor
-        self.processor = AutoProcessor.from_pretrained(translation_model_name)
-        
-        # Load the model with appropriate quantization settings
-        if device == "cuda" and (load_in_4bit or load_in_8bit):
-            self.model = AutoModelForImageTextToText.from_pretrained(
-                translation_model_name,
-                device_map="auto",
-                quantization_config=bnb_config
-            )
-        elif device == "cuda":
-            self.model = AutoModelForImageTextToText.from_pretrained(
-                translation_model_name,
-                device_map="auto"
-            )
-        else:
-            self.model = AutoModelForImageTextToText.from_pretrained(
-                translation_model_name,
-                torch_dtype=torch.float32,
-                device_map={"": "cpu"},
-                low_cpu_mem_usage=True
-            )
-
-    def _format_prompt_for_n2d(self, narrative: str, dialogue: str, name_map: dict) -> str:
-        """
-        Formats the narrative and dialogue into a prompt for the translation model.
-
-        Args:
-            narrative (str): The narrative text to be translated.
-            dialogue (str): The dialogue text to be translated.
-            name_map (dict): A mapping of character names for consistent translation.
-
-        Returns:
-            str: The formatted prompt for the translation model.
-        """
-        instruction = (
-            "You are a professional translator. I will provide a Story Narrative and a Dialogue. "
-            "Your task is to translate BOTH into Bengali. "
-            "\nRules:"
-            "\n1. First, translate the 'Narrative' section."
-            "\n2. Second, translate the 'Dialogue' section."
-            f"\n3. Use these character names: {name_map}."
-            "\n4. Use 'Apni' for formal and 'Tumi' for informal tones based on the story."
-            "\n5. Keep the format 'Name: Text' for the dialogue."
+        # Tokenizer and model loading
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            translation_model_name, trust_remote_code=True
         )
 
-        content_text = (
-            f"{instruction}\n\n"
-            f"### English Narrative:\n{narrative}\n\n"
-            f"### English Dialogue:\n{dialogue}\n\n"
-            "### Bengali Translation (Narrative followed by Dialogue):"
+        torch_dtype = torch.float16 if use_fp16 else torch.float32
+
+        model_kwargs = dict(
+            **{
+                "trust_remote_code": True,
+                "dtype": torch_dtype,
+            }
         )
 
-        return [{
-            "role": "user",
-            "content": [{
-                "type": "text",
-                "source_lang_code": self.source_lang,
-                "target_lang_code": self.target_lang,
-                "text": content_text
-            }]
-        }]
+        # Optionally include attention implementation if provided
+        if attn_implementation:
+            model_kwargs["attn_implementation"] = attn_implementation
 
-    def translate_names(self, names: list) -> dict:
-        """
-        Translates character names based.
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(
+            translation_model_name, **model_kwargs
+        ).to(self.device)
 
-        Args:
-            names (list): A list of character names to be translated.
+        # Some IndicTrans2 + transformers versions fail when decoder cache is enabled.
+        self.model.config.use_cache = False
 
-        Returns:
-            dict: A mapping of original names to translated names.
-        """
-        names_str = ", ".join(names)
-        instruction = "Translate the following list of names into Bengali. Output only the Bengali names separated by commas."
+        self.ip = IndicProcessor(inference=True)
 
-        mapping_prompt = f"{instruction}\nNames: {names_str}"
+    def _translate_batch(self, inputs: List[str], max_length: int = 512) -> List[str]:
+        if not inputs:
+            return []
 
-        messages = [{
-            "role": "user",
-            "content": [{
-                "type": "text",
-                "source_lang_code": self.source_lang,
-                "target_lang_code": self.target_lang,
-                "text": mapping_prompt
-            }]
-        }]
+        # Pre-process inputs to add language tags and clean text
+        processed_inputs = self.ip.preprocess_batch(
+            inputs,
+            src_lang=self.source_lang_code,
+            tgt_lang=self.target_lang_code,
+        )
 
-        inputs = self.processor.apply_chat_template(
-            messages,
-            tokenize=True,
-            add_generation_prompt=True,
-            return_dict=True,
-            return_tensors="pt"
-        ).to(self.model.device)
-        input_len = len(inputs['input_ids'][0])
+        # Tokenize inputs with truncation and padding
+        tokenized = self.tokenizer(
+            processed_inputs,
+            truncation=True,
+            padding="longest",
+            return_tensors="pt",
+            return_attention_mask=True,
+        ).to(self.device)
 
+        # Generate translations with no_grad for efficiency
         with torch.inference_mode():
-            generation = self.model.generate(**inputs, do_sample=False)
+            generated_tokens = self.model.generate(
+                **tokenized,
+                min_length=0,
+                max_length=max_length,
+                num_beams=5,
+                use_cache=False,
+                num_return_sequences=1,
+            )
 
-        generation = generation[0][input_len:]
-        decoded = self.processor.decode(generation, skip_special_tokens=True)
-        translated_names = [name.strip() for name in decoded.split(",")]
-        
-        return dict(zip(names, translated_names))
+        # Decode and post-process translations
+        decoded = self.tokenizer.batch_decode(
+            generated_tokens,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True,
+        )
+        # Post-process removes the tags and cleans up extra spaces
+        translations = self.ip.postprocess_batch(decoded, lang=self.target_lang_code)
+
+        return [t.strip() for t in translations]
+
+    def _translate_name_batch(self, names: List[str]) -> Dict[str, str]:
+        """
+        Translate a list of character names directly using IndicTrans2.
+        """
+        if not names:
+            return {}
+
+        translated_names = self._translate_batch(names, max_length=128)
+
+        if not translated_names:
+            return {n: n for n in names}  # Fallback to original name if failed
+
+        sanitized_translations = [
+            t.strip().replace(".", "") for t in translated_names
+        ]
+
+        if len(sanitized_translations) < len(names):
+            print(
+                f"Warning: Name mismatch. Expected {len(names)}, got {len(sanitized_translations)}")
+            while len(sanitized_translations) < len(names):
+                sanitized_translations.append(names[len(sanitized_translations)])
+
+        return dict(zip(names, sanitized_translations))
+
+    def _save_name_mapping(self, name_mapping: Dict[str, str], filename: str = "name_mapping.json") -> None:
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(name_mapping, f, ensure_ascii=False, indent=4)
+
+    def translate_names(self, names: List[str], batch_size: int = 128, save_mapping: bool = True, filename: str = "name_mapping.json") -> Dict[str, str]:
+        """Translate a list of character names in batches and optionally save mapping.
+        """
+        full_mapping: Dict[str, str] = {}
+        for i in tqdm(range(0, len(names), batch_size), desc="Translating names"):
+            batch_names = names[i : i + batch_size]
+            batch_mapping = self._translate_name_batch(batch_names)
+            full_mapping.update(batch_mapping)
+
+        if save_mapping:
+            self._save_name_mapping(full_mapping, filename)
+
+        return full_mapping
+
+    def translate_text(self, text: str, max_length: int = 512) -> str:
+        """Translate the input text and return the translated string.
+        """
+        translations = self._translate_batch([text], max_length=max_length)
+        return translations[0] if translations else ""
+    
+    def translate_texts(self, texts: List[str], batch_size: int = 16, max_length: int = 512) -> List[str]:
+        """Translate a list of texts in batches and return the list of translated strings.
+        """
+        translated_texts: List[str] = []
+        for i in tqdm(range(0, len(texts), batch_size), desc="Translating texts"):
+            batch_texts = texts[i : i + batch_size]
+            batch_translations = self._translate_batch(batch_texts, max_length=max_length)
+            translated_texts.extend(batch_translations)
+        return translated_texts
