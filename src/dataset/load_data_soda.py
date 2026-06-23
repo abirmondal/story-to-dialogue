@@ -9,7 +9,7 @@ import json
 import random
 from transformers import AutoTokenizer
 from datasets import load_dataset, load_dataset_builder, DatasetDict, Dataset
-from config.dir import SODA_HF_REPO
+from config.dir import SODA_HF_REPO, SODA_BENGALI_HF_REPO
 from config.dialogue_special_tokens import DIALOGUE_END_TOKEN, DEFAULT_SEPARATOR_TOKEN
 from config.llama_config import get_chat_template
 
@@ -19,6 +19,7 @@ class SODADataLoader:
     """
     def __init__(
             self,
+            use_bengali_soda: bool = False,
             data_types: list[str] = ['train', 'test', 'validation'],
             use_features: list[str] = ['narrative', 'dialogue', 'speakers'],
             percent_of_all_splits: float | None = None,
@@ -42,6 +43,7 @@ class SODADataLoader:
         Initializes the SODADataLoader with specified parameters.
 
         Args:
+            use_bengali_soda (bool): If `True`, loads the SODA Bengali dataset. Default is `False`.
             data_types (list): List of dataset splits to load. Options are `train`, `test`, `validation`.
             use_features (list): List of features to retain from the dataset. For all features, use `['all']`.
             percent_of_all_splits (float | None): Percentage of each split to load (between 0 and 100). Default is `None`, which loads the full splits.
@@ -112,6 +114,7 @@ class SODADataLoader:
         # store small config params centrally (avoid setting as many self.* attributes)
         self.dataset_info: dict = {
             'params': {
+                'use_bengali_soda': use_bengali_soda,
                 'data_types': data_types,
                 'use_features': use_features,
                 'percent_of_all_splits': percent_of_all_splits,
@@ -133,7 +136,7 @@ class SODADataLoader:
         }
 
         # load, filter and preprocess using local params and dataset_info
-        dataset = self.__load_data(splits=data_types, features=use_features, percent_of_all_splits=percent_of_all_splits, samples_per_split=samples_per_split)
+        dataset = self.__load_data(splits=data_types, features=use_features, percent_of_all_splits=percent_of_all_splits, samples_per_split=samples_per_split, use_bengali_soda=use_bengali_soda)
         dataset = self.__filter_by_story_length(dataset, min_story_length=min_story_length, max_story_length=max_story_length)
         dataset = self.__filter_by_dialogue_length(dataset, min_dialogue_length=min_dialogue_length, max_dialogue_length=max_dialogue_length)
         self.dataset = self.__preprocess_data(
@@ -159,25 +162,39 @@ class SODADataLoader:
             splits: list[str],
             features: list[str],
             percent_of_all_splits: float | None = None,
-            samples_per_split: int | None = None
+            samples_per_split: int | None = None,
+            use_bengali_soda: bool = False
         ) -> DatasetDict:
         """
         Loads the SODA dataset from the Hugging Face repository.
         """
         dataset = {}
+        repo = SODA_BENGALI_HF_REPO if use_bengali_soda else SODA_HF_REPO
+        rename_map = {
+            'translated_narrative': 'narrative',
+            'translated_dialogue': 'dialogue',
+            'translated_speakers': 'speakers'
+        }
+
         for split in splits:
             if samples_per_split is not None:
                 split_str = f"[:{samples_per_split}]"
             elif percent_of_all_splits is not None:
-                ds_builder = load_dataset_builder(SODA_HF_REPO)
+                ds_builder = load_dataset_builder(repo)
                 total_num_samples = ds_builder.info.splits[split].num_examples
                 num_samples_to_load = int((percent_of_all_splits / 100) * total_num_samples)
                 split_str = f"[:{num_samples_to_load}]"
             else:
                 split_str = ""
-            dataset[split] = load_dataset(SODA_HF_REPO, split=f"{split}{split_str}")
+            dataset[split] = load_dataset(repo, split=f"{split}{split_str}")
         dataset = DatasetDict(dataset)
         ds_keys = list(dataset.keys())
+
+        for split in ds_keys:
+            if use_bengali_soda:
+                for old_name, new_name in rename_map.items():
+                    if old_name in dataset[split].column_names:
+                        dataset[split] = dataset[split].rename_column(old_name, new_name)
 
         for split in ds_keys:
             if 'all' not in features:

@@ -12,6 +12,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SODA dataset HuggingFace Repository
 SODA_HF_REPO = "allenai/soda"
 
+# SODA Bengali dataset HuggingFace Repository
+SODA_BENGALI_HF_REPO = "abirmondalind/soda_bengali_small"
+
 # Directory to save prediction files
 PREDICTIONS_DIR = BASE_DIR / "predictions"
 
