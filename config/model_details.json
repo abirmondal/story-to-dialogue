@@ -3,45 +3,52 @@
         "full-dialogue": {
             "hf-commit-id": "e433a19747f5711e6d526c770513101946a056cc",
             "hf-org-model-path": "meta-llama/Llama-3.2-1B-Instruct",
-            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-Llama3.2-1B-QLoRA"
+            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-Llama3.2-1B-QLoRA",
+            "is_lora": true
         }
     },
     "BART-Large-LoRA": {
         "turn-by-turn": {
             "hf-commit-id": "9efd7c82b9b288417921d9e1743959818204663a",
             "hf-org-model-path": "facebook/bart-large",
-            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-BART-Large-LoRA"
+            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-BART-Large-LoRA",
+            "is_lora": true
         }
     },
     "BART-LoRA": {
         "turn-by-turn": {
             "hf-commit-id": "5d671360acad574afac587e3b8e893a7e12ed631",
             "hf-org-model-path": "facebook/bart-base",
-            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-BART-LoRA"
+            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-BART-LoRA",
+            "is_lora": true
         },
         "full-dialogue": {
             "hf-commit-id": "68e6e0c706c3eab97507bb61183f5f359b5cce68",
             "hf-org-model-path": "facebook/bart-base",
-            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-BART-LoRA"
+            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-BART-LoRA",
+            "is_lora": true
         }
     },
     "BART-FT": {
         "full-dialogue": {
             "hf-commit-id": "c62afe49b378e988dd4358b2d9d9a575b23fcb8e",
             "hf-org-model-path": "facebook/bart-base",
-            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-BART"
+            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-BART",
+            "is_lora": false
         }
     },
     "T5-LoRA": {
         "turn-by-turn": {
             "hf-commit-id": "19a2ec5515dda5b41b55446c5a91ef78ee8ee615",
             "hf-org-model-path": "google-t5/t5-base",
-            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-T5-LoRA"
+            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-T5-LoRA",
+            "is_lora": true
         },
         "full-dialogue": {
             "hf-commit-id": "89a0f869855df1fa700643d5d1067ee65d6fb093",
             "hf-org-model-path": "google-t5/t5-base",
-            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-T5-LoRA"
+            "hf-ft-model-path": "abirmondalind/story2dialogue-SODA-T5-LoRA",
+            "is_lora": true
         }
     }
 }
